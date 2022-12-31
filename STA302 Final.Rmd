@@ -1,0 +1,391 @@
+---
+title: "Predicting Red Wine Preferences Based on Physicochemical Properties"
+author: "Joyce Nguyen"
+date: "December 20th, 2022"
+output: pdf_document
+---
+```{r, warning=F, include=F}
+library(tidyverse)
+library(dplyr)
+library(knitr)
+library(car)
+```
+
+# Introduction
+
+The wine industry has been investing in multiple technologies to improve their wine making process. But wine classification is a difficult task because of the complex savoring process. This brings up a challenge for wine producers to determine which type of wine to target their consumers.
+
+From customers’ point of view, although a lot can be said from the extrinsic elements of wine such (Muller & Szolnoki, 2010), scientific reports are consistently showing that customers are into making decisions based on taste (Staub & Siegrist, 2022) as it is a useful indicator even when the consumer is not wine-savvy. By focusing on the intrinsic side of wine, Cortez et al. (2009) had analyzed the quality of wine based on its physicochemical properties, but the fuzzy techniques that were used were not rigorous enough as they were based on a lot of assumptions and might not be widely accepted.
+
+In order to facilitate that, this report aims to investigate the linear relationship between consumers’ red wine preferences and different physiocochemical properties. It will result in a linear regression model that wine producers can use to predict the trend in customers’ preferences to improvise their wine-making and selling strategies. 
+
+
+# Methods
+The *Wine Quality Data Set* used for our analysis was collected from the UCI machine learning respiratory, containing concentration information of 11 physicochemical properties in Portuguese "Vinho Verde" red wine variants. Using the R and statistical methods, we will be able to pick out the best fit linear regression model to predict the dependent variable Quality.
+
+*Linear Regression Model* is a linear approach for modeling the relationship between a response and independent variables, along with some random deviations. By understanding the underlying relationships, we will be able to use the model to predict the outcome.
+
+## Variable Selection
+
+Firstly, we will randomly sample and split the data into training and testing datasets so we can validate the accuracy of the model later on. To make sure that a linear model is a good choice, we will go through preliminary and formal checks for assumptions and additional conditions of a linear model. If these visualizations confirm the violations, it is necessary to perform appropriate data transformations and refit the model. We can consider transforming both predictors and outcome simultaneously or individually, depending on where the patterns of violations exist.
+
+After that, by using t-tests, partial F-tests and multicollinearity, it should be possible to determine which predictors are statistically significant and which ones can be removed from the model. To be  more specific, we will base our judgment of removal on p-values in t-tests and partial F-tests, and variance inflation factors in multicollinearity. Keeping in mind that after each reducing step, it is crucial to take the new fitted model and check for the assumptions and p-values all over again.
+
+Finally, problematic points should also be identified and acknowledged.
+
+## Model Validation
+
+The goal of building this linear regression model is to make predictions about data so it is necessary to validate the accuracy of the model. In order to do that, after building the model with the training set, we will apply the model onto the testing one to compare and validate whether the final model works properly. During this process, we should go through the whole process of checking for the coefficients, statistical significance of predictors, assumptions, multicollinearity, problematic points, and finally compare the results with the training dataset.
+
+## Model Violations and Diagnosis
+
+After each time fitting a model, we should go through some histograms and scatterplots to preliminarily check for whether the assumptions and additional conditions of a linear model hold. If the graphs suggest any signs of violations, we will continue with the checking process, but this time using the fitted model to formally approach the assumptions. There are three types of scatterplots to make: one between fitted values and residuals, between predictors and residuals, and a normal Q-Q plot, which will help us in identifying the assumptions of linearity, constant variance, and normality.
+
+When violations exist, we can consider transforming our variables. Although simple transformations are encouraged, we can still use Power Transformations or BoxCox methods of transformation to facilitate this modification step of data.
+
+Finally, it is important to use different methods such as Cook’s and DFFITS to diagnose any problematic points.
+
+\newpage
+
+# Results
+## Data Description
+```{r, echo=F}
+winequality <- read.csv("winequality-red.csv")
+winequality <- na.omit(winequality)
+```
+
+Figure 1: Histograms of Wine Quality Dataset variables
+
+```{r, echo=F}
+par(mfrow=c(3,4))
+hist(winequality$fixed.acidity, main="", xlab="Fixed Acidity")
+hist(winequality$volatile.acidity, main="", xlab="Volatile Acidity")
+hist(winequality$citric.acid, main="", xlab="Citric Acid")
+hist(winequality$residual.sugar, main="", xlab="Residual Sugar")
+hist(winequality$chlorides, main="", xlab="Chlorides")
+hist(winequality$free.sulfur.dioxide, main="", xlab="Free Sulfur Dioxide")
+hist(winequality$total.sulfur.dioxide, main="", xlab="Total Sulfur")
+hist(winequality$density, main="", xlab="Density")
+hist(winequality$pH, main="", xlab="pH")
+hist(winequality$sulphates, main="", xlab="Sulphates")
+hist(winequality$alcohol, main="", xlab="Alcohol")
+hist(winequality$quality, main="", xlab="Quality")
+```
+Figure 1 highlights some problems we might face with a model. Most of the predictors are skewed, showing the potential to see maybe linearity problems or just poorly fitting models. Now we formally check for assumptions.
+
+\newpage
+
+Figure 2: Residual plots for accessing the assumptions of models
+
+```{r, echo=F, fig.width=9, fig.height=9}
+# Split into training and tesing datasets
+set.seed(1006873643)
+winesample <- sample(1:1599, 800, replace=F)
+train <- winequality[winesample, ]
+test <- winequality[-winesample, ]
+
+# Fitting full model
+full <- lm(quality ~ ., data=train)
+
+# Checking assumptions
+matrix <- model.matrix(full)
+rfull <- full$residuals
+
+par(mfrow=c(4,4))
+plot(rfull ~ full$fitted.values, xlab="Fitted Values", ylab="Residuals")
+
+for(i in 2:12){
+  plot(rfull ~ matrix[ ,i], xlab=colnames(matrix)[i], ylab="Residuals")
+}
+
+qqnorm(rfull)
+qqline(rfull)
+```
+
+These plots show that the assumptions of linearity and normality are adequately satisfied. However, we observe one main problem: fanning of the residuals which tells us constant variance is violated. So transformations should be attempted to mitigate these problems. Since we seem to observe a pattern with only a few variables, we will only take the logarithm of those that need transformations, and re-check the assumptions to ensure they were corrected.
+
+```{r, include=F, fig.width=9, fig.height=9}
+# Create transformed dataset
+winenew <- winequality
+winenew$fixed.acidity <- log(winequality$fixed.acidity)
+winenew$volatile.acidity <- log(winequality$volatile.acidity)
+winenew$residual.sugar <- log(winequality$residual.sugar)
+winenew$chlorides <- log(winequality$chlorides)
+winenew$free.sulfur.dioxide <- log(winequality$free.sulfur.dioxide)
+winenew$total.sulfur.dioxide <- log(winequality$total.sulfur.dioxide)
+winenew$sulphates <- log(winequality$sulphates)
+winenew$alcohol <- log(winequality$alcohol)
+
+# Split into training and tesing datasets
+set.seed(1006873643)
+winesample <- sample(1:1599, 800, replace=F)
+train_new <- winenew[winesample, ]
+test_new <- winenew[-winesample, ]
+
+# Fitting new full model
+full2 <- lm(quality ~ ., data=train_new)
+matrix2 <- model.matrix(full2)
+
+# Checking assumptions for new full model
+rfull2 <- full2$residuals
+
+par(mfrow=c(4,4))
+plot(rfull2 ~ full2$fitted.values, xlab="Fitted Values", ylab="Residuals")
+
+for(i in 2:12){
+plot(rfull2 ~ matrix2[ ,i], xlab=colnames(matrix2)[i], ylab="Residuals")
+}
+
+# QQ plot
+qqnorm(rfull2)
+qqline(rfull2)
+
+
+# Find the mean of each variable in both the training and test datasets
+means_train <- round(apply(train_new, 2, mean), 2)
+means_test <- round(apply(test_new, 2, mean), 2)
+# Find the standard deviation of each variable in both datasets
+sds_train <- round(apply(train_new, 2, sd),2)
+sds_test <- round(apply(test_new, 2, sd), 2)
+```
+
+After transforming the data and checking again for the newly fitted model, the problem of fanning pattern in variance has significantly improved. We then split the data into training and testing datasets after randomly sampling and splitting equally, and here is the table of the characteristics of the two datasets.
+
+Variable | Training Set | Testing Set
+---------|--------------|--------------
+Fixed Acidity | `r means_train[1] ` (`r sds_train[1]`) | `r means_test[1]` (`r sds_test[1]`)
+Volatile Acidity | `r means_train[2]` (`r sds_train[2]`) | `r means_test[2]` (`r sds_test[2]`)
+Citric Acid | `r means_train[3]` (`r sds_train[3]`)| `r means_test[3]` (`r sds_test[3]`)
+Residual Sugar | `r means_train[4]` (`r sds_train[4]`) | `r means_test[4]` (`r sds_test[4]`)
+Chlorides | `r means_train[5]` (`r sds_train[5]`) | `r means_test[5]` (`r sds_test[5]`)
+Free Sulfur Dioxide| `r means_train[6]` (`r sds_train[6]`) | `r means_test[6]` (`r sds_test[6]`)
+Total Sulfur Dioxide | `r means_train[7]` (`r sds_train[7]`) | `r means_test[7]` (`r sds_test[7]`)
+Density | `r means_train[8]` (`r sds_train[8]`) | `r means_test[8]` (`r sds_test[8]`)
+pH | `r means_train[9]` (`r sds_train[9]`) | `r means_test[9]` (`r sds_test[9]`)
+Sulphates | `r means_train[10]` (`r sds_train[10]`) | `r means_test[10]` (`r sds_test[10]`)
+Alcohol | `r means_train[11]` (`r sds_train[11]`) | `r means_test[11]` (`r sds_test[11]`)
+Quality | `r means_train[12]` (`r sds_train[12]`) | `r means_test[12]` (`r sds_test[12]`)
+
+Table: Summary of charateristics for Training (n = 800) and Testing (n = 799) data sets.
+
+All of the variables in two datasets are numerical, summarized as means (standard deviations). From the table, it is clear that the values are quite similar in both datasets.
+
+## Analysing Process and Results
+
+```{r, include=F}
+summary(full2)
+vif(full2) # Fixed Acidity and Density has VIF > 5 => Less likely to see a significant relationship
+```
+
+```{r, include=F}
+# Remove statistically insignificant variables (p-values > 0.05)
+mod1 <- lm(quality ~ .,data=train_new[, -c(3, 4, 5, 6, 7, 8, 9)])
+# => sufficient evidence to say that one of the removed item is statistically significant
+vif(mod1)
+summary(mod1)
+anova(mod1, full2)
+
+# Remove VIF > 5
+mod2 <- lm(quality ~ .,data=train_new[, -c(1, 3, 4, 5, 6, 7, 8, 9)])
+anova(mod2, full2) # p-value = 0.07 > 0.05 => fail to reject null hypothesis
+vif(mod2)
+summary(mod2)
+```
+
+By fitting the linear model for the transformed data, we can now evaluate them and consider reducing to only having a few key indicators, i.e. using the backward elimination.
+
+We fit a linear model for Quality that included 11 predictors respectively to 11 physicochemical properties in the dataset, but there are only 4 properties that are significantly related to the quality (p-value of t-test on slope < 0.0001). So we conducted a partial F-test to compare the linear model involving only these four predictors to the initial model. The test failed to reject the null hypothesis that all the removed predictors were not necessary, so we got our first reduced model. The remaining predictors for this model are: Fixed Acidity, Volatile Acidity, Sulphates, and Alcohol.
+
+Now looking at multicollinearity of the full model, we see that Fixed Acidity and Density have VIF > 5. By removing these two variables in addition to the four removed ones, we got our second reduced model. The remaining predictors for this model are: Volatile Acidity, Sulphates, and Alcohol.
+
+After removing all insignificant terms, we are now left with two potential models.
+
+## Goodness of Final Model
+
+Here we implement the corrected AIC with the penalty term, BIC, adjusted R squared, as well as applying testing data to the models and looking at some problematic points to find out which one of the two candidate models has the best fit.
+```{r, include=F}
+# AIC function with the additional penalty term
+select = function(model, n)
+{
+  SSres <- sum(model$residuals^2)
+  Rsq <- summary(model)$r.squared
+  Rsq_adj <- summary(model)$adj.r.squared
+  p <- length(model$coefficients) - 1
+  AIC <- n*log(SSres/n) + 2*p     # you could also use AIC()
+  AICc <- AIC + (2*(p+2)*(p+3)/(n-p-1))
+  BIC <- n*log(SSres/n) + (p+2)*log(n)    # could also use BIC()
+  res <- c(SSres, Rsq, Rsq_adj, AIC, AICc, BIC)
+  names(res) <- c("SSres", "Rsq", "Rsq_adj", "AIC", "AIC_c", "BIC")
+  return(res)
+}
+
+# Apply to the models
+s1 <- select(full2, nrow(train_new))
+s2 <- select(mod1, nrow(train_new))
+s3 <- select(mod2, nrow(train_new))
+```
+
+Model | Adjusted $R^2$ | Corrected AIC | BIC 
+------|----------------|-----|-----
+Full model | `r round(s1[3], 2)` | `r round(s1[4])` | `r round(s1[6])`
+Reduced Model 1 | `r round(s2[3], 2)` | `r round(s2[4])` | `r round(s2[6])`
+Reduced Model 2 | `r round(s3[3], 2)` | `r round(s3[4])` | `r round(s3[6])`
+
+Table: Summary of goodness measures for models fit to Quality.
+
+R squared values in both models do not change much from the full model ones, indicating little information was lost by removing those predictors. Although results from the BIC for both models are the same, AIC tells us that model 2 seems to be a better fit.
+
+```{r, include=F}
+# Mod1: first with training then with test set
+p1 <- length(coef(mod1))-1
+n1 <- nrow(train)
+vif1 <- max(vif(mod1))
+D1 <- length(which(cooks.distance(mod1) > qf(0.5, p1+1, n1-p1-1)))
+fits1 <- length(which(abs(dffits(mod1)) > 2*sqrt((p1+1)/n1)))
+
+coefs1 <- round(summary(mod1)$coefficients[,1], 3)
+ses1 <- round(summary(mod1)$coefficients[,2], 3)
+
+# fit in test dataset
+mod1test <- mod1 <- lm(quality ~ .,data=test_new[, -c(3, 4, 5, 6, 7, 8, 9)])
+
+tp1 <- length(coef(mod1test))-1
+tn1 <- nrow(test_new)
+tvif1 <- max(vif(mod1test))
+tD1 <- length(which(cooks.distance(mod1test) > qf(0.5, tp1+1, tn1-tp1-1)))
+tfits1 <- length(which(abs(dffits(mod1test)) > 2*sqrt((tp1+1)/tn1)))
+
+tcoefs1 <- round(summary(mod1test)$coefficients[,1], 3)
+tses1 <- round(summary(mod1test)$coefficients[,2], 3)
+
+# Checking assumption for mod1
+X1 <- model.matrix(mod1)
+rmod1 <- mod1$residuals
+
+par(mfrow=c(2,3))
+plot(rmod1 ~ mod1$fitted.values, xlab="Fitted Values", ylab="Residuals")
+
+for(i in 2:5){
+plot(rmod1 ~ X1[ ,i], xlab=colnames(X1)[i], ylab="Residuals")
+}
+
+qqnorm(rmod1)
+qqline(rmod1)
+
+# Mod2: first with training then with test set
+p2 <- length(coef(mod2))-1
+n2 <- nrow(train_new)
+vif2 <- max(vif(mod2))
+D2 <- length(which(cooks.distance(mod2) > qf(0.5, p2+1, n2-p2-1)))
+fits2 <- length(which(abs(dffits(mod2)) > 2*sqrt((p2+1)/n2)))
+
+coefs2 <- round(summary(mod2)$coefficients[,1], 3)
+ses2 <- round(summary(mod2)$coefficients[,2], 3)
+
+# fit in test dataset
+mod2test <- lm(quality ~ .,data=test_new[, -c(1, 3, 4, 5, 6, 7, 8, 9)])
+
+tp2 <- length(coef(mod2test))-1
+tn2 <- nrow(test_new)
+tvif2 <- max(vif(mod2test))
+tD2 <- length(which(cooks.distance(mod2test) > qf(0.5, tp2+1, tn2-tp2-1)))
+tfits2 <- length(which(abs(dffits(mod2test)) > 2*sqrt((tp2+1)/tn2)))
+
+tcoefs2 <- round(summary(mod2test)$coefficients[,1], 3)
+tses2 <- round(summary(mod2test)$coefficients[,2], 3)
+
+# Checking assumption for mod2
+X2 <- model.matrix(mod2)
+rmod2 <- mod2$residuals
+
+par(mfrow=c(2,3))
+plot(rmod2 ~ mod2$fitted.values, xlab="Fitted Values", ylab="Residuals")
+
+for(i in 2:4){
+plot(rmod2 ~ X2[ ,i], xlab=colnames(X2)[i], ylab="Residuals")
+}
+
+qqnorm(rmod2)
+qqline(rmod2)
+```
+
+Characteristic | Model 1 (Train) | Model 1 (Test) | Model 2 (Train) | Model 2 (Test)
+---------------|----------------|---------------|-----------------|---------------
+Largest VIF value | `r vif1` | `r tvif1` | `r vif2` | `r tvif2`
+\# Cook's D | `r D1` | `r tD1` | `r D2` | `r tD2`
+\# DFFITS | `r fits1` | `r tfits1` | `r fits2` | `r tfits2`
+Violations | none | none | none | none
+---------------|----------------|---------------|-----------------|---------------
+Intercept | `r coefs1[1]` $\pm$ `r ses1[1]` (\*) | `r tcoefs1[1]` $\pm$ `r tses1[1]` (\*) |`r coefs2[1]` $\pm$ `r ses2[1]`  | `r tcoefs2[1]` $\pm$ `r tses2[1]`
+Fixed Acidity  | `r coefs1[2]` $\pm$ `r ses1[2]` |`r tcoefs1[2]` $\pm$ `r tses1[2]`| - | -
+Volatile Acidity  | `r coefs1[3]` $\pm$ `r ses1[3]` (\*)|`r tcoefs1[3]` $\pm$ `r tses1[3]` (\*)| `r coefs2[2]` $\pm$ `r ses2[2]` (\*) | `r tcoefs2[2]` $\pm$ `r tses2[2]` (\*)
+Sulphates | `r coefs1[4]` $\pm$ `r ses1[4]` (\*) | `r tcoefs1[4]` $\pm$ `r tses1[4]`(\*) | `r coefs2[3]` $\pm$ `r ses2[3]` (\*) | `r tcoefs2[3]` $\pm$ `r tses2[3]` (\*)
+Alcohol  | `r coefs1[5]` $\pm$ `r ses1[5]` (\*) | `r tcoefs1[5]` $\pm$ `r tses1[5]`(\*) | `r coefs2[5]` $\pm$ `r ses2[4]` (\*)  | `r tcoefs2[4]` $\pm$ `r tses2[4]` (\*)
+
+Table: Summary of characteristics of two candidate models in the training and test datasets.
+
+Model 1 uses log(Fixed Acidity), log(Volatile Acidity), log(Sulphates), and log(Alcohol) as predictors, while Model 2 uses log(Volatile Acidity), log(Sulphates), and log(Alcohol) as predictors. Response is Quality in both models. Coefficients are presented as estimate $\pm$ SE (\* = significant t-test at $\alpha = 0.05$).
+
+The Cook's D measurement shows there are no observations that were identified as influential on the entire regression surface. Results from DFFITS show that Model 2 holds a better fit since we identified only 46 who influenced their own fitted values when fitting with the training set, rather than 51 in Model 1. We also proceeded to check the assumptions for each linear model, and found that there are not any major issues with them.
+
+Considering results from both Table 2 and 3, we can conclude that Model 2 would be the best fit linear regression model for our prediction on wine quality.
+
+\newpage
+
+# Discussion
+## Final Model Description and Importance
+
+We have found the final model for our prediction on wine quality, which contains log(Volatile Acidity), log(Sulphates), and log(Alcohol) as predictors. The model adequately meets all the assumptions and additional conditions for the linear model, all predictors are statistically significant (p-value on slope of t-test < 0.0001), little information was lost by reducing the predictors from 11 to 3, and no major problems occurred with problematic points. The remaining predictors also give us a hint about how customers like their wine to be: Volatile Acidity gives a fruity-smelling, raspberry, passion fruit, or cherry-like flavors, Sulphates either offers a citrus-like smells or cooked egg-like smells depending on its concentration, with a hint of bitterness from Alcohol. These are important insights that wine producers can depend on and explore new strategies to target their customers.
+
+## Limitations
+
+One limitation of the model is that since quality is an ordinal categorical variable, it is quite hard to see whether the linearity in the additional condition of the linear model is hold. This problem might be solved by collecting more datapoints from a larger sample. The second problem identified is that although there are no observations influencing the entire regression, there are still around 50 that influenced their own fitted values. Since it is unethical to modify data to make our model "perfect", it is important to acknowledge its existence so users of the model can keep these in mind. 
+
+\newpage
+
+# Appendix
+
+Apendix 1: Check for additional condition 1 of original dataset and transformed one
+```{r, echo=F, fig.align='center'}
+par(mfrow=c(1,2))
+# Condition 1 OG dataset
+plot(train$quality ~ fitted(full), main="Response vs Fitted OG dataset", xlab="Fitted", ylab="Quality")
+lines(lowess(train$quality ~ fitted(full)))
+abline(a=0, b=1)
+# Condition 1 transformed dataset
+plot(train_new$quality ~ fitted(full2), main="Response vs Fitted Transformed dataset", xlab="Fitted", ylab="Quality")
+lines(lowess(train_new$quality ~ fitted(full2)))
+abline(a=0, b=1)
+```
+Despite the ordinal categorical nature of the variable, we can see a slight trend of linearity here in both datasets.
+
+\newpage
+
+Appendix 2: Check for additional condition 2 of original dataset
+```{r, echo=F, fig.align='center'}
+# Condition 2 OG dataset
+pairs(winequality[,1:12])
+```
+We can tell from the original dataset that there exists some multicollinearity between variables that need to be accessed.
+
+\newpage
+
+Appendix 3: Check for additional condition 2 of transformed dataset
+```{r, echo=F, fig.align='center'}
+# Condition 2 transformed dataset
+pairs(winenew[,1:12])
+```
+After transforming the data, there still exists some multicollinearity, which indicates we should try to remove some with high VIF.
+
+
+\newpage
+
+# References
+
+Cortez, P.,Cerdeira, A., Almeida, F., Matos, T., and Reis, J. (2009). Modeling wine preferences by data mining from physicochemical properties. In Decision Support Systems, Elsevier, 47(4):547-553. Retrieved October 22, 2022, from [https://www.scitepress.org/Papers/2015/55519/55519.pdf](https://www.scitepress.org/Papers/2015/55519/55519.pdf)
+
+
+Mueller and Szolnoki (2010). S. Mueller, G. Szolnoki. The relative influence of packaging, labelling, branding and sensory attributes on liking and purchase intent: Consumers differ in their responsiveness. Food Quality and Preference, 21 (7) (2010), pp. 774-783. [https://doi.org/10.1016/j.foodqual.2010.07.011](https://doi.org/10.1016/j.foodqual.2010.07.011)
+
+
+Staub, C., & Siegrist, M. (2022, February 3). Rethinking the wine list: Restaurant customers' preference for listing wines according to wine style. International Journal of Wine Business Research. Retrieved October 22, 2022, from [https://www.emerald.com/insight/content/doi/10.1108/IJWBR-06-2021-0034/full/html](https://www.emerald.com/insight/content/doi/10.1108/IJWBR-06-2021-0034/full/html)
